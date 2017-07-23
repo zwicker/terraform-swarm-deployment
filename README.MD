@@ -12,6 +12,7 @@ This terraform command will create a new terraform plan and build the following 
 
 ```
 cd devops/
+
 terraform plan
 terraform apply
 
