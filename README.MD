@@ -11,6 +11,7 @@ This terraform command will create a new terraform plan and build the following 
 * 2 Docker Swarm Servers
 
 ```
+cd devops/
 terraform plan
 terraform apply
 
@@ -23,9 +24,9 @@ Follow the output prompt after servers have deployed
 
 In a CICD environment this command would be 
 
-### Deploy full service to 
+### Deploy full service to swarm using compose file
 ```
-
+docker stack deploy --compose-file=docker-compose.yml prod
 ```
 
 ## Individual deployment services
