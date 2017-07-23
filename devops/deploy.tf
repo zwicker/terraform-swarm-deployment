@@ -115,7 +115,7 @@ resource "aws_instance" "slave" {
   ami           = "ami-4e686b2d"
   instance_type = "t2.medium"
   vpc_security_group_ids = ["${aws_security_group.production_webservers.id}"]
-  key_name = "${aws_key_pair.deployer.key_name}"
+  key_name      = "${var.keyname}"
   connection {
         type = "ssh"
         user = "ubuntu"
