@@ -1,0 +1,23 @@
+version: "3"
+services:
+  node:
+    image: zwicker/node-app
+    ports:
+      - 3000:3000
+    deploy:
+      mode: replicated
+      replicas: 2
+  go:
+    image: zwicker/go-app
+    ports:
+      - 8080:8080
+    deploy:
+      mode: replicated
+      replicas: 2
+  haproxy:
+    image: zwicker/haproxy_v1
+    ports:
+      - 80:80
+    deploy:
+      mode: replicated
+      replicas: 2
