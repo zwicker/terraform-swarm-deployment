@@ -20,7 +20,7 @@ resource "aws_internet_gateway" "production_docker" {
 # the instances over SSH and HTTP
 resource "aws_security_group" "production_webservers" {
   name        = "production_webservers"
-  description = "Used in generating skedulo webservices"
+  description = "Used in generating webservices"
   vpc_id      = "${aws_vpc.production_docker.id}"
 
   # SSH access from anywhere
@@ -108,7 +108,7 @@ resource "aws_subnet" "production_docker" {
 
 resource "aws_instance" "master" {
   ami           = "ami-4e686b2d"
-  instance_type = "t2.medium"
+  instance_type = "t2.micro"
   vpc_security_group_ids = ["${aws_security_group.production_webservers.id}"]
   subnet_id     = "${aws_subnet.production_docker.id}"
   key_name      = "${var.keyname}"
@@ -119,21 +119,22 @@ resource "aws_instance" "master" {
         timeout = "2m"
         agent = false
     }
+  provisioner "file" {
+    source = "docker-compose.yml"
+    destination = "/home/ubuntu/docker-compose.yml"
+  }
   provisioner "remote-exec" {
     inline = [
       "sudo apt-get update",
-      "sudo apt-get install apt-transport-https ca-certificates curl software-properties-common",
+      "sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common",
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
       "sudo add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\"",
       "sudo apt-get update",
-      "sudo apt-get install -y docker-ce=17.06.0~ce-0~ubuntu-xenial",
+      "sudo apt-get install -y docker-ce=17.06.0~ce-0~ubuntu",
       "sudo docker swarm init",
-      "sudo docker swarm join-token --quiet worker > /home/ubuntu/token"
+      "sudo docker swarm join-token --quiet worker > /home/ubuntu/token",
+      "sudo docker stack deploy --compose-file=/home/ubuntu/docker-compose.yml app"
     ]
-  }
-  provisioner "file" {
-    source = "proj"
-    destination = "/home/ubuntu/"
   }
   tags = { 
     Name = "swarm-master"
@@ -143,8 +144,10 @@ resource "aws_instance" "master" {
 resource "aws_instance" "slave" {
   count         = 2
   ami           = "ami-4e686b2d"
-  instance_type = "t2.medium"
+  depends_on    = ["aws_instance.master"]
+  instance_type = "t2.micro"
   vpc_security_group_ids = ["${aws_security_group.production_webservers.id}"]
+  subnet_id     = "${aws_subnet.production_docker.id}"
   key_name      = "${var.keyname}"
   connection {
         type = "ssh"
@@ -154,19 +157,19 @@ resource "aws_instance" "slave" {
         agent = false
     }
   provisioner "file" {
-    source = "key.pem"
-    destination = "/home/ubuntu/key.pem"
+    source = "${var.keyfile}"
+    destination = "/home/ubuntu/${var.keyfile}"
   }
   provisioner "remote-exec" {
     inline = [
       "sudo apt-get update",
-      "sudo apt-get install apt-transport-https ca-certificates curl software-properties-common",
+      "sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common",
       "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
       "sudo add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\"",
       "sudo apt-get update",
-      "sudo apt-get install -y docker-ce=17.06.0~ce-0~ubuntu-xenial",
-      "sudo chmod 400 /home/ubuntu/test.pem",
-      "sudo scp -o StrictHostKeyChecking=no -o NoHostAuthenticationForLocalhost=yes -o UserKnownHostsFile=/dev/null -i test.pem ubuntu@${aws_instance.master.private_ip}:/home/ubuntu/token .",
+      "sudo apt-get install -y docker-ce=17.06.0~ce-0~ubuntu",
+      "sudo chmod 400 /home/ubuntu/${var.keyfile}",
+      "sudo scp -o StrictHostKeyChecking=no -o NoHostAuthenticationForLocalhost=yes -o UserKnownHostsFile=/dev/null -i ${var.keyfile} ubuntu@${aws_instance.master.private_ip}:/home/ubuntu/token .",
       "sudo docker swarm join --token $(cat /home/ubuntu/token) ${aws_instance.master.private_ip}:2377"
     ]
   }
@@ -176,5 +179,9 @@ resource "aws_instance" "slave" {
 }
 
 output "ip" {
-    value = "Please connect to - http://${aws_instance.master.public_ip}/go/ or http://${aws_instance.master.public_ip}/js/"
+    value = "To see the deployed services please go to - http://${aws_instance.master.public_ip}/go/ or http://${aws_instance.master.public_ip}/js/"
+}
+
+output "ssh" {
+  value = "Please ssh to swarm master to deploy more services at - ssh -i ${var.keyfile} ubuntu@${aws_instance.master.public_ip}"
 }
